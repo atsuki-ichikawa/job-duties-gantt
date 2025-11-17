@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>作業内容チャート</title>
+  <style>
+    :root {
+      --label-width: 280px;
+      --lane-height: 28px;
+      --timeline-bg: #f5f7ff;
+      --border-color: #d8deed;
+      --bar-level-1: #5179ff;
+      --bar-level-2: #f2783c;
+      --bar-level-3: #30b79f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f3f5fb;
+      font-family: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #1f2430;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 28px 40px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.6rem;
+    }
+
+    .hint {
+      margin: 0 0 18px;
+      font-size: 0.92rem;
+      color: #4b5468;
+    }
+
+    .timeline-scale {
+      display: grid;
+      grid-template-columns: var(--label-width) 1fr;
+      align-items: end;
+      font-size: 0.8rem;
+      color: #3c4457;
+      margin-bottom: 10px;
+    }
+
+    .scale-track {
+      position: relative;
+      height: 32px;
+      background: var(--timeline-bg);
+      border: 1px solid var(--border-color);
+      overflow: visible;
+    }
+
+    .scale-mark {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-left: 1px dotted rgba(82, 91, 125, 0.25);
+    }
+
+    .scale-mark.major {
+      border-left-style: solid;
+      border-left-color: rgba(57, 64, 94, 0.4);
+    }
+
+    .scale-mark span {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translate(-50%, -3px);
+      white-space: nowrap;
+      font-size: 0.75rem;
+    }
+
+    .chart {
+      border: 1px solid var(--border-color);
+      background: #fff;
+      position: relative;
+    }
+
+    .chart-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .task-row {
+      display: grid;
+      grid-template-columns: var(--label-width) 1fr;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .task-row:first-of-type {
+      border-top: none;
+    }
+
+    .label-column,
+    .track-column {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .label-entry {
+      height: var(--lane-height);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-bottom: 1px solid #edf1fb;
+      cursor: default;
+    }
+
+    .label-entry:last-child {
+      border-bottom: none;
+    }
+
+    .label-entry.level-1 {
+      background: #fff;
+      color: #0d1a3a;
+    }
+
+    .label-entry.level-2 {
+      background: #f9fbff;
+      color: #2b0d3e;
+    }
+
+    .label-entry.level-3 {
+      background: #f4f7ff;
+      color: #093e32;
+    }
+
+    .label-entry.has-children {
+      cursor: pointer;
+    }
+
+    .label-entry span.name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toggle-icon {
+      width: 14px;
+      height: 14px;
+      border: 1px solid #9da6b9;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      border-radius: 2px;
+      color: #5b6271;
+      flex-shrink: 0;
+    }
+
+    .lane {
+      position: relative;
+      height: var(--lane-height);
+      border-bottom: 1px solid #edf1fb;
+    }
+
+    .lane:last-child {
+      border-bottom: none;
+    }
+
+    .lane-track {
+      position: absolute;
+      inset: 0;
+      background: var(--timeline-bg);
+      border: 1px solid #cfd5e8;
+      overflow: visible;
+    }
+
+    .lane.level-2 .lane-track {
+      background: #fef8f4;
+    }
+
+    .lane.level-3 .lane-track {
+      background: #f2fffc;
+    }
+
+    .lane-guide {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-left: 1px dotted rgba(82, 91, 125, 0.2);
+      pointer-events: none;
+    }
+
+    .lane-guide.major {
+      border-left-style: solid;
+      border-left-color: rgba(45, 53, 88, 0.28);
+    }
+
+    .segment {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      padding: 0 4px;
+      border: 1px solid rgba(15, 23, 42, 0.45);
+      background: #777;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .segment.level-1 {
+      background: var(--bar-level-1);
+    }
+
+    .segment.level-1.auto {
+      background: #517aff55;
+      color: #17244f;
+      border-color: rgba(40, 53, 102, 0.5);
+    }
+
+    .segment.level-2 {
+      background: var(--bar-level-2);
+    }
+
+    .segment.level-2.auto {
+      background: #f2783c55;
+      color: #57260e;
+      border-color: rgba(87, 38, 14, 0.45);
+    }
+
+    .segment.level-3 {
+      background: var(--bar-level-3);
+    }
+
+    .segment.level-3.auto {
+      background: #30b79f55;
+      color: #064338;
+      border-color: rgba(6, 67, 56, 0.4);
+    }
+
+    .note,
+    .no-time {
+      position: absolute;
+      inset: 0;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      color: #3c4458;
+    }
+
+    .note {
+      background: rgba(255, 249, 222, 0.6);
+      border: 1px solid #f1dfad;
+    }
+
+    .segment-outside-label {
+      position: absolute;
+      transform: translateY(-50%);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #2b3143;
+      background: #fff;
+      padding: 0 4px;
+      border: 1px solid #ccd2e3;
+      border-radius: 3px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    @media (max-width: 900px) {
+      :root {
+        --label-width: 220px;
+      }
+
+      main {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>作業内容チャート</h1>
+    <p class="hint">タスク名をクリックすると下位レイヤーが同じ時間軸で親バーの内部に展開</p>
+    <div class="timeline-scale">
+      <div></div>
+      <div class="scale-track" id="scaleTrack"></div>
+    </div>
+    <div class="chart" id="chart">
+      <div class="chart-content" id="chartContent"></div>
+    </div>
+  </main>
+  <script>
+    const tasks = [
+      {
+        name: '見切りなど',
+        segments: [
+          { start: '18:05', end: '18:10' },
+          { start: '18:20', end: '18:29' },
+          { start: '19:00', end: '19:30' },
+          { start: '20:00', end: '20:15' },
+          { start: '20:40', end: '20:50' },
+          { start: '21:15', end: '21:40' }
+        ],
+        children: [
+          {
+            name: 'デリカ見切り',
+            segments: [
+              { start: '18:05', end: '18:10' },
+              { start: '19:00', end: '19:10' },
+              { start: '20:00', end: '20:15' },
+              { start: '20:40', end: '20:50' },
+              { start: '21:15', end: '21:20' }
+            ],
+            children: [
+              {
+                name: 'サンデイリー見切り',
+                segments: [
+                  { label: '一次', start: '18:05', end: '18:10' },
+                  { label: '二次', start: '19:00', end: '19:05' },
+                  { label: '半額', start: '20:00', end: '20:05' }
+                ]
+              },
+              {
+                name: '寿司&リトル見切り',
+                segments: [
+                  { label: '一次', start: '19:05', end: '19:10' },
+                  { label: '二次', start: '20:05', end: '20:10' },
+                  { label: '半額', start: '20:45', end: '20:50' }
+                ]
+              },
+              {
+                name: '揚げ物&弁当見切り',
+                segments: [
+                  { label: '一次', start: '20:10', end: '20:15' },
+                  { label: '二次', start: '20:40', end: '20:45' },
+                  { label: '半額', start: '21:15', end: '21:20' }
+                ]
+              }
+            ]
+          },
+          {
+            name: '水産見切り',
+            segments: [
+              { label: '一次', start: '18:20', end: '18:29' },
+              { label: '半額', start: '19:20', end: '19:30' }
+            ]
+          },
+          {
+            name: '夜間必須の記録',
+            segments: [
+              { start: '19:10', end: '19:12' }
+            ]
+          },
+          {
+            name: 'パン&冷惣最菜',
+            segments: [
+              { label: '半額', start: '19:12', end: '19:20' }
+            ]
+          },
+          {
+            name: '畜産&冷惣菜一割',
+            segments: [
+              { label: '一割', start: '21:20', end: '21:40' }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'レジ',
+        segments: [
+          { start: '18:30', end: '19:00' }
+        ]
+      },
+      {
+        name: '油ろ過',
+        segments: [
+          { start: '18:00', end: '18:05' },
+          { start: '18:05', end: '18:15', auto: true },
+          { start: '18:15', end: '18:20' },
+          { start: '18:20', end: '18:29' , auto: true},
+          { start: '18:29', end: '19:00', auto: true },
+          { start: '19:30', end: '19:40' }
+        ],
+        children: [
+          {
+            name: '1層目清掃',
+            segments: [
+              { start: '18:00', end: '18:05' },
+              { start: '18:05', end: '18:15', auto: true }
+            ],
+            children: [
+              {
+                name: 'ろ過機を回す',
+                segments: [
+                  { label: '10分以上', start: '18:00', end: '18:10', auto: true }
+                ]
+              },
+              {
+                name: 'フライヤーを磨く',
+                segments: [
+                  { start: '18:00', end: '18:05' }
+                ]
+              },
+              {
+                name: '油を溜める',
+                segments: [
+                  { label: '3分以上', start: '18:10', end: '18:15', auto: true }
+                ]
+              }
+            ]
+          },
+          {
+            name: '2層目清掃',
+            segments: [
+              { start: '18:15', end: '18:20' },
+              { start: '18:20', end: '18:29', auto: true },
+              { start: '18:29', end: '19:00', auto: true }
+            ],
+            children: [
+              {
+                name: 'ろ過機を回す',
+                segments: [
+                  { label: '10分以上', start: '18:15', end: '18:29', auto: true }
+                ]
+              },
+              {
+                name: 'フライヤーを磨く',
+                segments: [
+                  { start: '18:15', end: '18:20' }
+                ]
+              },
+              {
+                name: '油を溜める',
+                segments: [
+                  { label: '3分以上', start: '18:29', end: '19:00', auto: true }
+                ]
+              }
+            ]
+          },
+          {
+            name: 'ろ過機清掃',
+            segments: [
+              { start: '19:30', end: '19:40' }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'パイレッシュ洗浄',
+        segments: [
+          { start: '19:40', end: '20:00' }
+        ]
+      },
+      {
+        name: '油追加 & 大鍋洗浄',
+        segments: [
+          { start: '20:15', end: '20:20' }
+        ]
+      },
+      {
+        name: '洗浄機を使った洗浄',
+        segments: [
+          { start: '18:00', end: '21:00', auto: true }
+        ],
+        children: [
+          {
+            name: 'バットや油切りハサミなど',
+            segments: [
+               { label: '空いた時間に対応', start: '18:00', end: '20:50', auto: true }
+            ]
+          },
+          {
+            name: '排水溝の洗浄',
+            segments: [
+               { label: 'ゴミ出しの前に実施', start: '20:18', end: '20:20' }
+            ]
+          },
+          {
+            name: '洗浄機の清掃',
+            segments: [
+               { label: '床掃除の途中で実施', start: '20:55', end: '21:00' }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'ゴミ出し',
+        segments: [
+          { start: '20:20', end: '20:40' }
+        ]
+      },
+      {
+        name: '床掃除',
+        segments: [
+          { start: '20:50', end: '21:15' }
+        ]
+      },
+      {
+        name: 'その他の作業',
+        segments: [
+          { start: '21:40', end: '22:00' }
+        ],
+        children: [
+          {
+            name: '集計や設備確認',
+            notes: ['集計・ガス・照明・エアコン・換気扇、机や台の汚れ確認']
+          }
+        ]
+      }
+    ];
+
+    const timeToMinutes = (time) => {
+      if (!time) return null;
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const allSegments = [];
+    const collectSegments = (node) => {
+      if (node.segments) {
+        node.segments.forEach((segment) => {
+          const start = timeToMinutes(segment.start);
+          const end = timeToMinutes(segment.end);
+          if (start !== null && end !== null) {
+            allSegments.push({ start, end });
+          }
+        });
+      }
+      if (node.children) {
+        node.children.forEach(collectSegments);
+      }
+    };
+
+    tasks.forEach(collectSegments);
+
+    const timelineStart = Math.min(...allSegments.map((s) => s.start));
+    const timelineEnd = Math.max(...allSegments.map((s) => s.end));
+    const totalMinutes = timelineEnd - timelineStart;
+
+    const formatTime = (minutes) => {
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const scaleTrack = document.getElementById('scaleTrack');
+    const chartContent = document.getElementById('chartContent');
+    const gridMarks = [];
+    for (let t = timelineStart; t <= timelineEnd; t += 5) {
+      gridMarks.push({
+        minutes: t,
+        isMajor: (t - timelineStart) % 30 === 0,
+        left: ((t - timelineStart) / totalMinutes) * 100
+      });
+    }
+
+    const buildScale = () => {
+      gridMarks.forEach((mark) => {
+        const scaleMark = document.createElement('div');
+        scaleMark.className = `scale-mark ${mark.isMajor ? 'major' : 'minor'}`;
+        scaleMark.style.left = `${mark.left}%`;
+        if (mark.isMajor) {
+          const label = document.createElement('span');
+          label.textContent = formatTime(mark.minutes);
+          scaleMark.appendChild(label);
+        }
+        scaleTrack.appendChild(scaleMark);
+      });
+    };
+
+    buildScale();
+
+    const prepareNode = (task, level = 1) => ({
+      ...task,
+      level,
+      expanded: false,
+      children: task.children ? task.children.map((child) => prepareNode(child, level + 1)) : null,
+      updateRow: () => {}
+    });
+
+    const rootNodes = tasks.map((task) => prepareNode(task, 1));
+
+    let overflowRaf = null;
+
+    const scheduleOverflowCheck = () => {
+      if (overflowRaf) cancelAnimationFrame(overflowRaf);
+      overflowRaf = requestAnimationFrame(applyOverflowLabels);
+    };
+
+    const applyOverflowLabels = () => {
+      document.querySelectorAll('.segment-outside-label').forEach((el) => el.remove());
+      document.querySelectorAll('.segment').forEach((bar) => {
+        const label = bar.dataset.labelText;
+        if (!label) {
+          bar.textContent = '';
+          return;
+        }
+        bar.textContent = label;
+        const fits = bar.scrollWidth <= bar.clientWidth - 4;
+        if (!fits) {
+          bar.textContent = '';
+          const lane = bar.closest('.lane-track');
+          if (!lane) return;
+          const outside = document.createElement('span');
+          outside.className = 'segment-outside-label';
+          outside.textContent = label;
+          outside.style.left = `${bar.offsetLeft + bar.offsetWidth + 4}px`;
+          outside.style.top = `${bar.offsetTop + bar.offsetHeight / 2}px`;
+          lane.appendChild(outside);
+        }
+      });
+    };
+
+    window.addEventListener('resize', () => scheduleOverflowCheck());
+
+    const createTaskRow = (rootNode) => {
+      const row = document.createElement('div');
+      row.className = 'task-row';
+      const labelCol = document.createElement('div');
+      labelCol.className = 'label-column';
+      const trackCol = document.createElement('div');
+      trackCol.className = 'track-column';
+      row.append(labelCol, trackCol);
+
+      const renderLane = (node, container) => {
+        const lane = document.createElement('div');
+        lane.className = `lane level-${node.level}`;
+        const track = document.createElement('div');
+        track.className = 'lane-track';
+        lane.appendChild(track);
+
+        if (gridMarks.length > 0) {
+          const guides = document.createDocumentFragment();
+          gridMarks.forEach((mark) => {
+            const guide = document.createElement('span');
+            guide.className = `lane-guide ${mark.isMajor ? 'major' : 'minor'}`;
+            guide.style.left = `${mark.left}%`;
+            guides.appendChild(guide);
+          });
+          track.appendChild(guides);
+        }
+
+        if (node.segments && node.segments.length > 0) {
+          node.segments.forEach((segment) => {
+            const start = timeToMinutes(segment.start);
+            const end = timeToMinutes(segment.end);
+            if (start === null || end === null) return;
+            const bar = document.createElement('div');
+            bar.className = `segment level-${node.level}`;
+            if (segment.auto) {
+              bar.classList.add('auto');
+            }
+            const left = ((start - timelineStart) / totalMinutes) * 100;
+            const width = ((end - start) / totalMinutes) * 100;
+            bar.style.left = `${left}%`;
+            bar.style.width = `${width}%`;
+            bar.dataset.labelText = segment.label || '';
+            const autoNote = segment.auto ? '（自動）' : '';
+            bar.title = `${node.name}${segment.label ? ` - ${segment.label}` : ''}: ${segment.start}〜${segment.end}${autoNote}`;
+            track.appendChild(bar);
+          });
+        } else if (node.notes && node.notes.length > 0) {
+          const note = document.createElement('div');
+          note.className = 'note';
+          note.textContent = node.notes.join(' / ');
+          track.appendChild(note);
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'no-time';
+          placeholder.textContent = '時間情報なし';
+          track.appendChild(placeholder);
+        }
+
+        container.appendChild(lane);
+      };
+
+      const renderLabels = (node, container) => {
+        const entry = document.createElement('div');
+        entry.className = `label-entry level-${node.level}`;
+        entry.style.paddingLeft = `calc(10px + ${(node.level - 1) * 16}px)`;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'name';
+        nameSpan.textContent = node.name;
+
+        if (node.children && node.children.length > 0) {
+          entry.classList.add('has-children');
+          const toggle = document.createElement('span');
+          toggle.className = 'toggle-icon';
+          toggle.textContent = node.expanded ? '▾' : '▸';
+          entry.prepend(toggle);
+          entry.addEventListener('click', () => {
+            node.expanded = !node.expanded;
+            redraw();
+          });
+        }
+
+        entry.appendChild(nameSpan);
+        container.appendChild(entry);
+      };
+
+      const redraw = () => {
+        labelCol.innerHTML = '';
+        trackCol.innerHTML = '';
+        const visibleNodes = [];
+        const walk = (node) => {
+          visibleNodes.push(node);
+          if (node.expanded && node.children && node.children.length > 0) {
+            node.children.forEach(walk);
+          }
+        };
+        walk(rootNode);
+        visibleNodes.forEach((node) => {
+          renderLabels(node, labelCol);
+          renderLane(node, trackCol);
+        });
+        scheduleOverflowCheck();
+      };
+
+      const propagateUpdate = (node) => {
+        node.updateRow = redraw;
+        if (node.children) {
+          node.children.forEach(propagateUpdate);
+        }
+      };
+
+      propagateUpdate(rootNode);
+      redraw();
+      return row;
+    };
+
+    rootNodes.forEach((node) => {
+      const row = createTaskRow(node);
+      chartContent.appendChild(row);
+    });
+
+    scheduleOverflowCheck();
+  </script>
+</body>
+</html>
